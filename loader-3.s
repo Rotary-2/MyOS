@@ -1,5 +1,5 @@
-[org LOADER_BASE_ADDR]
 %include "boot.inc"
+[org LOADER_BASE_ADDR]
     mov ax, 0xb800
     mov gs, ax
 

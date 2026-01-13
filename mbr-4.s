@@ -1,6 +1,6 @@
 %include "boot.inc"
 ; 主引导程序
-SECTION MBR vstart = 0x7c00
+SECTION MBR vstart=0x7c00
     ; 初始化段寄存器
     mov ax, cs
     mov ds, ax
