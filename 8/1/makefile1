@@ -42,9 +42,9 @@ $(BUILD_DIR)/debug.o: kernel/debug.c kernel/debug.h \
 	$(CC) $(CFLAGS) $< -o $@
 
 ##############    汇编代码编译    ###############
-$(BUILD_DIR)/kernel.o: kernel/kernel.S
+$(BUILD_DIR)/kernel.o: kernel/kernel.s
 	$(AS) $(ASFLAGS) $< -o $@
-$(BUILD_DIR)/print.o: lib/kernel/print.S
+$(BUILD_DIR)/print.o: lib/kernel/print.s
 	$(AS) $(ASFLAGS) $< -o $@
 
 ##############    链接所有目标文件    #############

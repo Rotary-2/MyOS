@@ -5,7 +5,7 @@
 // 中断处理函数类型
 typedef void (*intr_handler)(uint8_t vec_nr);
 // 函数声明
-void intr_init(void);                    // 初始化中断描述符表
+void idt_init(void);                    // 初始化中断描述符表
 
 /* 定义中断的两种状态:
  * INTR_OFF值为0,表示关中断,
