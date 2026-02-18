@@ -6,62 +6,13 @@ SELECTOR_VIDEO equ (0x0003<<3)+TI_GDT+RPL0
 section .data
     put_int_buffer dq 0
 section .text
-global put_char
+
+; -----------------  put_str  -----------------
+; 功能描述: 通过put_char来打印以0字符结尾的字符串
+; 输入: 栈中参数为打印的字符串
+; 输出: 无
+; ---------------------------------------------
 global put_str
-global put_int
-
-put_int:
-    pushad
-    mov ebp, esp
-    mov eax, [ebp+4 * 9]    ; 获取参数
-    mov edx, eax
-    mov edi, 7              ; 缓冲区偏移(从高位开始)
-    mov ecx, 8              ; 8个十六进制数字
-    mov ebx, put_int_buffer
-
-.convert_loop:
-    and edx, 0x0000000F     ; 取最低4位
-    cmp edx, 9
-    jg .hex_letter
-    add edx, '0'            ; 数字0-9
-    jmp .store
-.hex_letter:
-    sub edx, 10
-    add edx, 'A'            ; 字母A-F
-.store:
-    mov [ebx+edi], dl       ; 存入缓冲区
-    dec edi
-    shr eax, 4              ; 处理下4位
-    mov edx, eax
-    loop .convert_loop
-
-    ; 跳过高位0
-    inc edi
-    cmp edi, 8
-    je .full_zero
-.skip_zeros:
-    mov cl,  [ebx+edi]
-    inc edi
-    cmp cl, '0'
-    jz .skip_zeros
-    dec edi                 ; 指向第一个非零字符 
-
-.full_zero:
-    cmp edi, 8
-    jne .print
-    mov cl, '0'             ; 全零时输出单个0
-.print:
-    mov cl, [ebx+edi]
-    push ecx
-    call put_char
-    add esp, 4
-    inc edi
-    cmp edi, 8
-    jl .print
-
-    popad
-    ret
-
 put_str:
     push ebx
     push ecx
@@ -83,6 +34,12 @@ put_str:
     pop ebx
     ret
 
+; ----------------  put_char  ----------------
+; 功能描述: 把栈中的1个字符写入光标所在处
+; 输入: 栈顶参数为待打印字符 (调用者 push 传参)
+; 输出: 无
+; ---------------------------------------------
+global put_char
 put_char:
     pushad                  ; 备份寄存器
     mov ax, SELECTOR_VIDEO  ; 设置视频段选择子
@@ -185,3 +142,90 @@ put_char:
 
     popad                   ; 恢复寄存器
     ret
+
+; --------------------------------------  put_int  --------------------------------------
+; 功能描述: 将小端字节序的数字变成对应的ascii后, 倒置
+; 输入: 栈中参数为待打印的数字
+; 输出: 在屏幕上打印16进制数字, 并不会打印前缀0x, 如打印10进制15时, 只会直接打印f, 不会是0xf
+; ----------------------------------------------------------------------------------------
+global put_int
+put_int:
+    pushad
+    mov ebp, esp
+    mov eax, [ebp+4 * 9]    ; 获取参数
+    mov edx, eax
+    mov edi, 7              ; 缓冲区偏移(从高位开始)
+    mov ecx, 8              ; 8个十六进制数字
+    mov ebx, put_int_buffer
+
+.convert_loop:
+    and edx, 0x0000000F     ; 取最低4位
+    cmp edx, 9
+    jg .hex_letter
+    add edx, '0'            ; 数字0-9
+    jmp .store
+.hex_letter:
+    sub edx, 10
+    add edx, 'A'            ; 字母A-F
+.store:
+    mov [ebx+edi], dl       ; 存入缓冲区
+    dec edi
+    shr eax, 4              ; 处理下4位
+    mov edx, eax
+    loop .convert_loop
+
+    ; 跳过高位0
+    inc edi
+    cmp edi, 8
+    je .full_zero
+.skip_zeros:
+    mov cl,  [ebx+edi]
+    inc edi
+    cmp cl, '0'
+    jz .skip_zeros
+    dec edi                 ; 指向第一个非零字符 
+
+.full_zero:
+    cmp edi, 8
+    jne .print
+    mov cl, '0'             ; 全零时输出单个0
+.print:
+    mov cl, [ebx+edi]
+    push ecx
+    call put_char
+    add esp, 4
+    inc edi
+    cmp edi, 8
+    jl .print
+
+    popad
+    ret
+
+; ---------------  set_cursor  ---------------
+; 功能描述: 直接设置 VGA 光标位置
+; 输入: 栈中参数为光标位置 (0~1999)
+; 输出: 无
+; ---------------------------------------------
+
+global set_cursor
+set_cursor:
+   pushad
+   mov bx, [esp+36]
+; 先设置高8位 
+   mov dx, 0x03d4               ; 索引寄存器
+   mov al, 0x0e			    	; 用于提供光标位置的高8位
+   out dx, al
+   mov dx, 0x03d5		    	; 通过读写数据端口0x3d5来获得或设置光标位置 
+   mov al, bh
+   out dx, al
+
+; 再设置低8位
+   mov dx, 0x03d4
+   mov al, 0x0f
+   out dx, al
+   mov dx, 0x03d5 
+   mov al, bl
+   out dx, al
+   popad
+   ret
+

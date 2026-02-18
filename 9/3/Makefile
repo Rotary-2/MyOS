@@ -1,4 +1,8 @@
-BUILD_DIR = $(ROOT_DIR)build
+ROOT_DIR = ./
+BUILD_DIR = $(ROOT_DIR)build/
+BOOT_DIR = $(ROOT_DIR)boot/
+BOOT_INC = $(BOOT_DIR)include/
+
 ENTRY_POINT = 0xc0001500
 
 BOCHS   = $(ROOT_DIR)bin/bochs
@@ -19,8 +23,8 @@ LDFLAGS = -m elf_i386 -Ttext $(ENTRY_POINT) -e main -Map $(BUILD_DIR)/kernel.map
 OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/init.o $(BUILD_DIR)/interrupt.o \
       $(BUILD_DIR)/timer.o $(BUILD_DIR)/kernel.o $(BUILD_DIR)/print.o \
 	  $(BUILD_DIR)/debug.o $(BUILD_DIR)/memory.o $(BUILD_DIR)/bitmap.o \
-      $(BUILD_DIR)/debug.o $(BUILD_DIR)/memory.o $(BUILD_DIR)/bitmap.o \
-      $(BUILD_DIR)/string.o $(BUILD_DIR)/thread.o $(BUILD_DIR)/list.o
+      $(BUILD_DIR)/string.o $(BUILD_DIR)/thread.o $(BUILD_DIR)/list.o \
+	  $(BUILD_DIR)/switch.o
 
 ##############     c代码编译     ###############
 $(BUILD_DIR)/main.o: kernel/main.c lib/kernel/print.h \
@@ -69,29 +73,42 @@ $(BUILD_DIR)/list.o: lib/kernel/list.c lib/kernel/list.h kernel/global.h lib/std
 ##############    汇编代码编译    ###############
 $(BUILD_DIR)/kernel.o: kernel/kernel.s
 	$(AS) $(ASFLAGS) $< -o $@
+
 $(BUILD_DIR)/print.o: lib/kernel/print.s
+	$(AS) $(ASFLAGS) $< -o $@
+
+$(BUILD_DIR)/switch.o: thread/switch.s
 	$(AS) $(ASFLAGS) $< -o $@
 
 ##############    链接所有目标文件    #############
 $(BUILD_DIR)/kernel.bin: $(OBJS)
 	$(LD) $(LDFLAGS) $^ -o $@
 
-.PHONY : mk_dir hd clean all
+$(BUILD_DIR)/mbr.bin: $(BOOT_DIR)mbr.s
+	nasm -I $(BOOT_INC) -o $@ $<
+
+$(BUILD_DIR)/loader.bin: $(BOOT_DIR)loader.s
+	nasm -I $(BOOT_INC) -o $@ $<
+
+##############    写入硬盘    ##############
+mbr: $(BUILD_DIR)/mbr.bin
+	dd if=$< of=$(DISKIMG) bs=512 count=1 conv=notrunc
+
+loader: $(BUILD_DIR)/loader.bin
+	dd if=$< of=$(DISKIMG) bs=512 count=4 seek=2 conv=notrunc
+
+kernel_hd: $(BUILD_DIR)/kernel.bin
+	dd if=$< of=$(DISKIMG) bs=512 count=200 seek=9 conv=notrunc
 
 mk_dir:
-	if [[ ! -d $(BUILD_DIR) ]];then mkdir $(BUILD_DIR);fi
-
-hd: $(BUILD_DIR)/kernel.bin
-	dd if=$(BUILD_DIR)/kernel.bin \
-	   of=$(DISKIMG) \
-	   bs=512 count=200 seek=9 conv=notrunc
+	@mkdir -p $(BUILD_DIR)
 
 clean:
 	cd $(BUILD_DIR) && rm -f ./*
 
 build: $(BUILD_DIR)/kernel.bin
 
-all: mk_dir build hd
+all: mk_dir mbr loader build kernel_hd
 
 run: all
 	$(BOCHS) -f $(BOCHSRC)
